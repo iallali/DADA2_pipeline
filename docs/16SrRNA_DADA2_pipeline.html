@@ -426,7 +426,6 @@ $(document).ready(function () {
 <h2><span style="color:green">Getting Ready</span></h2>
 <p>First, we load the <span style="color:blue">dada2</span> package on your RStudio. if you do not already have it, see the <a href="https://benjjneb.github.io/dada2/dada-installation.html">dada2 installation instructions</a>.</p>
 <pre class="r"><code>library(dada2); packageVersion(&quot;dada2&quot;)</code></pre>
-<pre><code>## Loading required package: Rcpp</code></pre>
 <pre><code>## [1] &#39;1.13.1&#39;</code></pre>
 <p>We set the path so that it points to the extracted directory of the dataset named “dog_samples” on your computer or cluster:</p>
 <pre class="r"><code>MY_HOME &lt;- Sys.getenv(&quot;HOME&quot;)
@@ -440,6 +439,168 @@ list.files(data)</code></pre>
 ## [21] &quot;Dog3_R1.fastq&quot;  &quot;Dog3_R2.fastq&quot;  &quot;Dog30_R1.fastq&quot; &quot;Dog30_R2.fastq&quot;
 ## [25] &quot;Dog31_R1.fastq&quot; &quot;Dog31_R2.fastq&quot; &quot;Dog8_R1.fastq&quot;  &quot;Dog8_R2.fastq&quot; 
 ## [29] &quot;Dog9_R1.fastq&quot;  &quot;Dog9_R2.fastq&quot;  &quot;filtered&quot;</code></pre>
+<p>If your listed files match those here, you can start running the DADA2 pipeline. <br/><br/></p>
+<p>Now, we read in the names of the fastq files and we sort them by forward and reverse. Then, we perform some string manipulation to extract a list of the sample names.</p>
+<pre class="r"><code># Forward and reverse fastq filenames have format: SAMPLENAME_R1.fastq and SAMPLENAME_R2.fastq
+dataF &lt;- sort(list.files(data, pattern=&quot;_R1.fastq&quot;, full.names = TRUE))
+dataR &lt;- sort(list.files(data, pattern=&quot;_R2.fastq&quot;, full.names = TRUE))
+
+# Extract sample names, assuming filenames have format: SAMPLENAME_XXX.fastq
+list.sample.names &lt;- sapply(strsplit(basename(dataF), &quot;_&quot;), `[`, 1)
+list.sample.names</code></pre>
+<pre><code>##  [1] &quot;Dog1&quot;  &quot;Dog10&quot; &quot;Dog15&quot; &quot;Dog16&quot; &quot;Dog17&quot; &quot;Dog2&quot;  &quot;Dog22&quot; &quot;Dog23&quot;
+##  [9] &quot;Dog24&quot; &quot;Dog29&quot; &quot;Dog3&quot;  &quot;Dog30&quot; &quot;Dog31&quot; &quot;Dog8&quot;  &quot;Dog9&quot;</code></pre>
+<p><br/><br/></p>
+</div>
+<div id="quality-control-on-the-raw-data" class="section level2">
+<h2><span style="color:green">1. Quality Control on the Raw Data</span></h2>
+<p>The first step of the pipeline consists on visualizing the quality profiles of the dataset.</p>
+<p>Here, we visualize the quality profiles of the Forward reads:</p>
+<pre class="r"><code>plotQualityProfile(dataF[1:3])</code></pre>
+<p><img src="16SrRNA_DADA2_pipeline_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<p><br/><br/></p>
+<p>We visualize the quality profiles of the Reverse reads:</p>
+<pre class="r"><code>plotQualityProfile(dataR[1:3])</code></pre>
+<p><img src="16SrRNA_DADA2_pipeline_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p><br/><br/> Here, we have only the quality plot for three fastq files you can visualize more plots on the figure.</p>
+<p><br/><br/></p>
+</div>
+<div id="filter-and-trim-the-raw-data" class="section level2">
+<h2><span style="color:green">2. Filter and Trim the Raw Data</span></h2>
+<p>We assign the filenames for the filtered &quot;_filt_fastq.gz&quot; files under the filtered/ subdirectory:</p>
+<pre class="r"><code># Place filtered files in filtered/ subdirectory
+filt.dataF &lt;- file.path(data, &quot;filtered&quot;, paste0(list.sample.names, &quot;_F_filt.fastq.gz&quot;))
+filt.dataR &lt;- file.path(data, &quot;filtered&quot;, paste0(list.sample.names, &quot;_R_filt.fastq.gz&quot;))
+names(filt.dataF) &lt;- list.sample.names
+names(filt.dataR) &lt;- list.sample.names</code></pre>
+<p>For the filtering, we will use these parameters: <strong>maxN = 0</strong> (DADA2 requeris no Ns), <strong>truncQ=2</strong>, <strong>rm.phix=TRUE</strong>, <strong>maxEE=2</strong> (it is the maximum number of expected errors allowed in a read), <strong>truncLen(290, 275)</strong> (it depends on the quality of your forward and reverse reads).</p>
+<pre class="r"><code>out &lt;- filterAndTrim(dataF, filt.dataF, dataR, filt.dataR, truncLen=c(290,275),
+              maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE,
+              compress=TRUE, multithread=TRUE) # On Windows set multithread=FALSE
+head(out)</code></pre>
+<pre><code>##                reads.in reads.out
+## Dog1_R1.fastq    118343     84815
+## Dog10_R1.fastq    79342     61952
+## Dog15_R1.fastq   131483     91235
+## Dog16_R1.fastq   114424     83564
+## Dog17_R1.fastq    99610     72919
+## Dog2_R1.fastq    108679     79668</code></pre>
+<p>This will take about 3 minutes to run. <br/><br/></p>
+</div>
+<div id="learn-the-error-rates" class="section level2">
+<h2><span style="color:green">3. Learn the Error Rates</span></h2>
+<p>The DADA2 pipeline uses the &gt;b&gt;learnErrors</b> method to learn the error model from the data, by alternating estimation of the error rates and inference of sample composition until they converge on a jointly consistent solution.</p>
+<p>We run the error rates on the Forward reads:</p>
+<pre class="r"><code>errF &lt;- learnErrors(filt.dataF, multithread=TRUE)</code></pre>
+<pre><code>## 114400650 total bases in 394485 reads from 5 samples will be used for learning the error rates.</code></pre>
+<p>And on the Reverse reads:</p>
+<pre class="r"><code>errR &lt;- learnErrors(filt.dataR, multithread=TRUE)</code></pre>
+<pre><code>## 108483375 total bases in 394485 reads from 5 samples will be used for learning the error rates.</code></pre>
+<p>Each command will take about 30 minutes to run.</p>
+<p>Now, we can visualize the estimated error rates for the Forward reads:</p>
+<pre class="r"><code>plotErrors(errF, nominalQ=TRUE)</code></pre>
+<pre><code>## Warning: Transformation introduced infinite values in continuous y-axis</code></pre>
+<p><img src="16SrRNA_DADA2_pipeline_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<p>We can visualize the estimated error rates for the Reverse reads:</p>
+<pre class="r"><code>plotErrors(errR, nominalQ=TRUE)</code></pre>
+<pre><code>## Warning: Transformation introduced infinite values in continuous y-axis</code></pre>
+<p><img src="16SrRNA_DADA2_pipeline_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
+<p><br/><br/></p>
+</div>
+<div id="sample-inference" class="section level2">
+<h2><span style="color:green">4. Sample Inference</span></h2>
+<p>Now, we apply the <b> core sample inference algorithm</b> on the trimmed and filtered Forward and Reverse reads.</p>
+<pre class="r"><code>dadaF &lt;- dada(filt.dataF, err=errF, multithread=TRUE)</code></pre>
+<pre><code>## Sample 1 - 84815 reads in 27400 unique sequences.
+## Sample 2 - 61952 reads in 22647 unique sequences.
+## Sample 3 - 91235 reads in 25511 unique sequences.
+## Sample 4 - 83564 reads in 27549 unique sequences.
+## Sample 5 - 72919 reads in 20661 unique sequences.
+## Sample 6 - 79668 reads in 27302 unique sequences.
+## Sample 7 - 109497 reads in 32980 unique sequences.
+## Sample 8 - 151271 reads in 49671 unique sequences.
+## Sample 9 - 124140 reads in 38909 unique sequences.
+## Sample 10 - 95125 reads in 29652 unique sequences.
+## Sample 11 - 76120 reads in 24476 unique sequences.
+## Sample 12 - 111204 reads in 38931 unique sequences.
+## Sample 13 - 111126 reads in 29513 unique sequences.
+## Sample 14 - 78442 reads in 25497 unique sequences.
+## Sample 15 - 82843 reads in 28341 unique sequences.</code></pre>
+<pre class="r"><code>dadaR &lt;- dada(filt.dataR, err=errR, multithread=TRUE)</code></pre>
+<pre><code>## Sample 1 - 84815 reads in 33646 unique sequences.
+## Sample 2 - 61952 reads in 24889 unique sequences.
+## Sample 3 - 91235 reads in 31503 unique sequences.
+## Sample 4 - 83564 reads in 32798 unique sequences.
+## Sample 5 - 72919 reads in 25394 unique sequences.
+## Sample 6 - 79668 reads in 33192 unique sequences.
+## Sample 7 - 109497 reads in 38506 unique sequences.
+## Sample 8 - 151271 reads in 55378 unique sequences.
+## Sample 9 - 124140 reads in 42968 unique sequences.
+## Sample 10 - 95125 reads in 32216 unique sequences.
+## Sample 11 - 76120 reads in 27791 unique sequences.
+## Sample 12 - 111204 reads in 42880 unique sequences.
+## Sample 13 - 111126 reads in 36037 unique sequences.
+## Sample 14 - 78442 reads in 30761 unique sequences.
+## Sample 15 - 82843 reads in 32614 unique sequences.</code></pre>
+<p>These steps make a dada-class object that can be visualized using the command below:</p>
+<pre class="r"><code>dadaF[[1]]</code></pre>
+<pre><code>## dada-class: object describing DADA2 denoising results
+## 642 sequence variants were inferred from 27400 input unique sequences.
+## Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16</code></pre>
+<p><br/><br/></p>
+</div>
+<div id="merge-the-paired-reads" class="section level2">
+<h2><span style="color:green">5. Merge the Paired Reads</span></h2>
+<p>In this step, we merge the Forward and Reverse reads to obtain the full sequences.</p>
+<pre class="r"><code>merge.reads &lt;- mergePairs(dadaF, filt.dataF, dadaR, filt.dataR, verbose=TRUE)</code></pre>
+<pre><code>## 76306 paired-reads (in 1153 unique pairings) successfully merged out of 82378 (in 2526 pairings) input.</code></pre>
+<pre><code>## 54948 paired-reads (in 720 unique pairings) successfully merged out of 60139 (in 1811 pairings) input.</code></pre>
+<pre><code>## 83013 paired-reads (in 843 unique pairings) successfully merged out of 89310 (in 2175 pairings) input.</code></pre>
+<pre><code>## 74533 paired-reads (in 1093 unique pairings) successfully merged out of 81135 (in 2674 pairings) input.</code></pre>
+<pre><code>## 67364 paired-reads (in 855 unique pairings) successfully merged out of 71053 (in 1743 pairings) input.</code></pre>
+<pre><code>## 69262 paired-reads (in 1194 unique pairings) successfully merged out of 76778 (in 2891 pairings) input.</code></pre>
+<pre><code>## 97401 paired-reads (in 954 unique pairings) successfully merged out of 106466 (in 2867 pairings) input.</code></pre>
+<pre><code>## 129237 paired-reads (in 1632 unique pairings) successfully merged out of 146610 (in 5263 pairings) input.</code></pre>
+<pre><code>## 111558 paired-reads (in 1143 unique pairings) successfully merged out of 120597 (in 3110 pairings) input.</code></pre>
+<pre><code>## 85319 paired-reads (in 839 unique pairings) successfully merged out of 92957 (in 2348 pairings) input.</code></pre>
+<pre><code>## 68550 paired-reads (in 915 unique pairings) successfully merged out of 74010 (in 2198 pairings) input.</code></pre>
+<pre><code>## 92870 paired-reads (in 1266 unique pairings) successfully merged out of 107043 (in 4252 pairings) input.</code></pre>
+<pre><code>## 101935 paired-reads (in 981 unique pairings) successfully merged out of 108579 (in 2495 pairings) input.</code></pre>
+<pre><code>## 70424 paired-reads (in 1093 unique pairings) successfully merged out of 75814 (in 2402 pairings) input.</code></pre>
+<pre><code>## 70177 paired-reads (in 1098 unique pairings) successfully merged out of 79761 (in 3258 pairings) input.</code></pre>
+<pre class="r"><code># Inspect the merger data.frame from the first sample
+head(merge.reads[[1]])</code></pre>
+<pre><code>##                                                                                                                                                                                                                                                                                                                    sequence
+## 1  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCGAGTAGTCCGGCTGACTGACTCGAGA
+## 2  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCTAGTAGTCCGGCTGACTGACTCGAGA
+## 3  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCCAGTAGTCCGGCTGACTGACTCGAGA
+## 4 TTGTGTGCCAGCAGCCGCGGTAATACGTAGGGGGCTAGCGTTATCCGGATTTACTGGGCGTAAAGGGTGCGTAGGCGGTCTTTCAAGTCAGGAGTTAAAGGCTACGGCTCAACCGTAGTAAGCTCCTGATACTGTCTGACTTGAGTGCAGGAGAGGAAAGCGGAATTCCCAGTGTAGCGGTGAAATGCGTAGATATTGGGAGGAACACCAGTAGCGAAGGCGGCTTTCTGGACTGTAACTGACGCTGAGGCACGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCTAGTAGTCCGGCTGACTGACTCGAGAG
+## 5  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCTTGTAGTCCGGCTGACTGACTCGAGA
+## 6  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCTGGTAGTCCGGCTGACTGACTCGAGA
+##   abundance forward reverse nmatch nmismatch nindel prefer accept
+## 1       460       2       1    253         0      0      2   TRUE
+## 2       456       1       1    253         0      0      2   TRUE
+## 3       421       5       1    253         0      0      2   TRUE
+## 4       414       7       2    252         0      0      2   TRUE
+## 5       401       6       1    253         0      0      2   TRUE
+## 6       400       4       1    253         0      0      2   TRUE</code></pre>
+<p>Then, we inspect the merger data.frame from the first sample.</p>
+<pre class="r"><code>head(merge.reads[[1]])</code></pre>
+<pre><code>##                                                                                                                                                                                                                                                                                                                    sequence
+## 1  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCGAGTAGTCCGGCTGACTGACTCGAGA
+## 2  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCTAGTAGTCCGGCTGACTGACTCGAGA
+## 3  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCCAGTAGTCCGGCTGACTGACTCGAGA
+## 4 TTGTGTGCCAGCAGCCGCGGTAATACGTAGGGGGCTAGCGTTATCCGGATTTACTGGGCGTAAAGGGTGCGTAGGCGGTCTTTCAAGTCAGGAGTTAAAGGCTACGGCTCAACCGTAGTAAGCTCCTGATACTGTCTGACTTGAGTGCAGGAGAGGAAAGCGGAATTCCCAGTGTAGCGGTGAAATGCGTAGATATTGGGAGGAACACCAGTAGCGAAGGCGGCTTTCTGGACTGTAACTGACGCTGAGGCACGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCTAGTAGTCCGGCTGACTGACTCGAGAG
+## 5  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCTTGTAGTCCGGCTGACTGACTCGAGA
+## 6  TGTGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAACTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCGTAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGAAACCCTGGTAGTCCGGCTGACTGACTCGAGA
+##   abundance forward reverse nmatch nmismatch nindel prefer accept
+## 1       460       2       1    253         0      0      2   TRUE
+## 2       456       1       1    253         0      0      2   TRUE
+## 3       421       5       1    253         0      0      2   TRUE
+## 4       414       7       2    252         0      0      2   TRUE
+## 5       401       6       1    253         0      0      2   TRUE
+## 6       400       4       1    253         0      0      2   TRUE</code></pre>
+<p><br/><br/></p>
 </div>
 
 
