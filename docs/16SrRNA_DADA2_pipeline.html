@@ -298,35 +298,148 @@ $(document).ready(function () {
 
 
 <p><br/><br/></p>
-<div id="general-information" class="section level2">
-<h2><span style="color:green">General Information</span></h2>
-<p>The material of taught in this module was developed by <a href="https://github.com/benjjneb">Benjamin Callahan</a>.</p>
-<p><strong>Who</strong> : The course is aimed at Master, PhD students, and other researchers working on microbiome studies.</p>
-<p><strong>When</strong> : 18th and 23rd of September 2019.</p>
-<p><strong>Requirements</strong>: Participants must have access to R or RStudio via their own computer or cluster.</p>
-<p><strong>Contact</strong> : Please email <a href="mailto:allali.imane@gmail.com" class="email">allali.imane@gmail.com</a> for more information. <br/><br/></p>
-<div id="prerequisities" class="section level4">
-<h4>Prerequisities</h4>
-<p>You should have your access to R and RStudio via your own compute or cluster. <br/><br/></p>
-</div>
-<div id="outcomes" class="section level4">
-<h4>Outcomes</h4>
-<ol style="list-style-type: decimal">
-<li>Understand each steps of 16S rRNA analysis pipeline using DADA2</li>
-<li>Run 16S rRNA analysis pipeline from raw reads</li>
-<li>Know how to edit files and use command line</li>
-<li>Choose the best approach and tools to analyze your data</li>
-</ol>
+<div id="the-dataset" class="section level2">
+<h2><span style="color:green">The dataset</span></h2>
+<p>The dataset we will be working are the practice dataset from the <a href="https://h3abionet.github.io/H3ABionet-SOPs/16s-rRNA-1-0.html">H3ABioNet 16S rDNA diversity analysis SOP</a>. The source data can be accessed <a href="http://h3data.cbio.uct.ac.za/assessments/16SrRNADiversityAnalysis/practice">here</a> but for our purposes it is already on the cluster.</p>
+<p>The table below contains the metadata associated with the dog stool samples. There are three dogs which are treated with increased percentage of a compound in their diet: 5 different treatments (0-4, representing an increased percentage of a compound in their diet).</p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Sample</th>
+<th align="center">Dog</th>
+<th align="center">Treatment</th>
+<th align="center">Read Counts r1</th>
+<th align="right">Read Counts r2</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Dog1</td>
+<td align="center">B</td>
+<td align="center">2</td>
+<td align="center">118343</td>
+<td align="right">118343</td>
+</tr>
+<tr class="even">
+<td align="left">Dog2</td>
+<td align="center">G</td>
+<td align="center">3</td>
+<td align="center">108679</td>
+<td align="right">108679</td>
+</tr>
+<tr class="odd">
+<td align="left">Dog3</td>
+<td align="center">K</td>
+<td align="center">3</td>
+<td align="center">101482</td>
+<td align="right">101482</td>
+</tr>
+<tr class="even">
+<td align="left">Dog8</td>
+<td align="center">B</td>
+<td align="center">4</td>
+<td align="center">108731</td>
+<td align="right">108731</td>
+</tr>
+<tr class="odd">
+<td align="left">Dog9</td>
+<td align="center">G</td>
+<td align="center">0</td>
+<td align="center">109500</td>
+<td align="right">109500</td>
+</tr>
+<tr class="even">
+<td align="left">Dog10</td>
+<td align="center">K</td>
+<td align="center">4</td>
+<td align="center">79342</td>
+<td align="right">79342</td>
+</tr>
+<tr class="odd">
+<td align="left">Dog15</td>
+<td align="center">B</td>
+<td align="center">1</td>
+<td align="center">131483</td>
+<td align="right">131483</td>
+</tr>
+<tr class="even">
+<td align="left">Dog16</td>
+<td align="center">G</td>
+<td align="center">4</td>
+<td align="center">114424</td>
+<td align="right">114424</td>
+</tr>
+<tr class="odd">
+<td align="left">Dog17</td>
+<td align="center">K</td>
+<td align="center">0</td>
+<td align="center">99610</td>
+<td align="right">99610</td>
+</tr>
+<tr class="even">
+<td align="left">Dog22</td>
+<td align="center">B</td>
+<td align="center">3</td>
+<td align="center">145029</td>
+<td align="right">145029</td>
+</tr>
+<tr class="odd">
+<td align="left">Dog23</td>
+<td align="center">G</td>
+<td align="center">1</td>
+<td align="center">193158</td>
+<td align="right">193158</td>
+</tr>
+<tr class="even">
+<td align="left">Dog24</td>
+<td align="center">K</td>
+<td align="center">2</td>
+<td align="center">162487</td>
+<td align="right">162487</td>
+</tr>
+<tr class="odd">
+<td align="left">Dog29</td>
+<td align="center">B</td>
+<td align="center">0</td>
+<td align="center">122776</td>
+<td align="right">122776</td>
+</tr>
+<tr class="even">
+<td align="left">Dog30</td>
+<td align="center">G</td>
+<td align="center">2</td>
+<td align="center">137315</td>
+<td align="right">137315</td>
+</tr>
+<tr class="odd">
+<td align="left">Dog31</td>
+<td align="center">K</td>
+<td align="center">1</td>
+<td align="center">150613</td>
+<td align="right">150613</td>
+</tr>
+</tbody>
+</table>
 <p><br/><br/></p>
 </div>
-<div id="when-you-get-lost-or-something-is-unclear" class="section level4">
-<h4>When you get lost or something is unclear</h4>
-<ol style="list-style-type: decimal">
-<li>Please find someone next to you that looks like they know what they are doing.</li>
-<li>Ask the teacher assistant.</li>
-<li>Let me know. <br/><br/></li>
-</ol>
-</div>
+<div id="getting-ready" class="section level2">
+<h2><span style="color:green">Getting Ready</span></h2>
+<p>First, we load the <span style="color:blue">dada2</span> package on your RStudio. if you do not already have it, see the <a href="https://benjjneb.github.io/dada2/dada-installation.html">dada2 installation instructions</a>.</p>
+<pre class="r"><code>library(dada2); packageVersion(&quot;dada2&quot;)</code></pre>
+<pre><code>## Loading required package: Rcpp</code></pre>
+<pre><code>## [1] &#39;1.13.1&#39;</code></pre>
+<p>We set the path so that it points to the extracted directory of the dataset named “dog_samples” on your computer or cluster:</p>
+<pre class="r"><code>MY_HOME &lt;- Sys.getenv(&quot;HOME&quot;)
+data &lt;- paste(MY_HOME, &quot;/dada2_tutorial_dog/dog_samples&quot;, sep=&#39;&#39;)  # change the path
+list.files(data)</code></pre>
+<pre><code>##  [1] &quot;Dog1_R1.fastq&quot;  &quot;Dog1_R2.fastq&quot;  &quot;Dog10_R1.fastq&quot; &quot;Dog10_R2.fastq&quot;
+##  [5] &quot;Dog15_R1.fastq&quot; &quot;Dog15_R2.fastq&quot; &quot;Dog16_R1.fastq&quot; &quot;Dog16_R2.fastq&quot;
+##  [9] &quot;Dog17_R1.fastq&quot; &quot;Dog17_R2.fastq&quot; &quot;Dog2_R1.fastq&quot;  &quot;Dog2_R2.fastq&quot; 
+## [13] &quot;Dog22_R1.fastq&quot; &quot;Dog22_R2.fastq&quot; &quot;Dog23_R1.fastq&quot; &quot;Dog23_R2.fastq&quot;
+## [17] &quot;Dog24_R1.fastq&quot; &quot;Dog24_R2.fastq&quot; &quot;Dog29_R1.fastq&quot; &quot;Dog29_R2.fastq&quot;
+## [21] &quot;Dog3_R1.fastq&quot;  &quot;Dog3_R2.fastq&quot;  &quot;Dog30_R1.fastq&quot; &quot;Dog30_R2.fastq&quot;
+## [25] &quot;Dog31_R1.fastq&quot; &quot;Dog31_R2.fastq&quot; &quot;Dog8_R1.fastq&quot;  &quot;Dog8_R2.fastq&quot; 
+## [29] &quot;Dog9_R1.fastq&quot;  &quot;Dog9_R2.fastq&quot;  &quot;filtered&quot;</code></pre>
 </div>
 
 
