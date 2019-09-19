@@ -68,7 +68,7 @@ list.sample.names
 ## <span style="color:green">1. Quality Control on the Raw Data</span>
 The first step of the pipeline consists on visualizing the quality profiles of the dataset. 
 
-Here, we visualize the quality profiles of the Forward reads:
+Here, we visualize the quality profiles of the forward reads:
 
 ```{r}
 plotQualityProfile(dataF[1:3])
@@ -76,7 +76,7 @@ plotQualityProfile(dataF[1:3])
 
 <br/><br/>
 
-We visualize the quality profiles of the Reverse reads:
+We visualize the quality profiles of the reverse reads:
 
 ```{r}
 plotQualityProfile(dataR[1:3])
@@ -99,6 +99,7 @@ names(filt.dataR) <- list.sample.names
 ```
 
 For the filtering, we will use these parameters:
+
 **maxN = 0** (DADA2 requeris no Ns), **truncQ=2**, **rm.phix=TRUE**, **maxEE=2** (it is the maximum number of expected errors allowed in a read), **truncLen(290, 275)** (it depends on the quality of your forward and reverse reads).
 
 ```{r}
@@ -113,27 +114,27 @@ This will take about 3 minutes to run.
 
 ## <span style="color:green">3. Learn the Error Rates</span>
 
-The DADA2 pipeline uses the >b>learnErrors</b> method to learn the error model from the data, by alternating estimation of the error rates and inference of sample composition until they converge on a jointly consistent solution.
+The DADA2 pipeline uses the <b>learnErrors</b> method to learn the error model from the data, by alternating the estimation of the error rates and inference of sample composition until they converge on a jointly consistent solution.
 
-We run the error rates on the Forward reads:
+We run the error rates on the forward reads:
 ```{r}
 errF <- learnErrors(filt.dataF, multithread=TRUE)
 ```
 
-And on the Reverse reads:
+And on the reverse reads:
 ```{r}
 errR <- learnErrors(filt.dataR, multithread=TRUE)
 ```
 
-Each command will take about 30 minutes to run.
+It will take about 30 minutes to run.
 
-Now, we can visualize the estimated error rates for the Forward reads:
+Now, we can visualize the estimated error rates for the forward reads:
 
 ```{r}
 plotErrors(errF, nominalQ=TRUE)
 ```
 
-We can visualize the estimated error rates for the Reverse reads:
+We can visualize the estimated error rates for the reverse reads:
 
 ```{r}
 plotErrors(errR, nominalQ=TRUE)
@@ -143,7 +144,7 @@ plotErrors(errR, nominalQ=TRUE)
 
 ## <span style="color:green">4. Sample Inference</span>
 
-Now, we apply the <b> core sample inference algorithm</b> on the trimmed and filtered Forward and Reverse reads.
+Now, we apply the <b>core sample inference algorithm</b> on the trimmed and filtered forward and reverse reads.
 
 ```{r}
 dadaF <- dada(filt.dataF, err=errF, multithread=TRUE)
@@ -152,6 +153,8 @@ dadaF <- dada(filt.dataF, err=errF, multithread=TRUE)
 ```{r}
 dadaR <- dada(filt.dataR, err=errR, multithread=TRUE)
 ```
+
+It will take about 15 minutes to run.
 
 These steps make a dada-class object that can be visualized using the command below:
 ```{r}
@@ -163,12 +166,10 @@ dadaF[[1]]
 
 ## <span style="color:green">5. Merge the Paired Reads</span>
 
-In this step, we merge the Forward and Reverse reads to obtain the full sequences.
+In this step, we merge the forward and reverse reads to obtain the full sequences.
 
 ```{r}
 merge.reads <- mergePairs(dadaF, filt.dataF, dadaR, filt.dataR, verbose=TRUE)
-# Inspect the merger data.frame from the first sample
-head(merge.reads[[1]])
 ```
 
 Then, we inspect the merger data.frame from the first sample.
@@ -177,3 +178,142 @@ head(merge.reads[[1]])
 ```
 
 <br/><br/>
+
+## <span style="color:green">6. Construct Sequence Table</span>
+
+We construct the amplicon sequence variant table (ASV):
+
+```{r}
+seqtab <- makeSequenceTable(merge.reads)
+dim(seqtab)
+```
+
+We inspect the distribution of sequence lengths:
+
+```{r}
+table(nchar(getSequences(seqtab)))
+```
+
+<br/><br/>
+
+## <span style="color:green">7. Remove Chimeras</span>
+
+
+We remove the chimeric ASVs.
+
+```{r}
+seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
+dim(seqtab.nochim)
+```
+
+```{r}
+sum(seqtab.nochim)/sum(seqtab)
+```
+
+<br/><br/>
+
+## <span style="color:green">8. Track Reads through the DADA2 Pipeline</span>
+
+In this step, we are going to track the number of reads that made it through each step in the DADA2 pipeline:
+
+```{r}
+getN <- function(x) sum(getUniques(x))
+track.nbr.reads <- cbind(out, sapply(dadaF, getN), sapply(dadaR, getN), sapply(merge.reads, getN), rowSums(seqtab.nochim))
+
+colnames(track.nbr.reads) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
+rownames(track.nbr.reads) <- list.sample.names
+head(track.nbr.reads)
+```
+
+<br/><br/>
+
+## <span style="color:green">9. Assign Taxonomy</span>
+
+Now, we assign taxonomy to the sequence variants. Before running the command below, download the <b>RefSeq-RDP16S_v3_May2018.fa.gz</b> file from [here](https://zenodo.org/record/3266798#.XXkOUS3MygS), and place it in your working directory with the dog samples folder.
+
+```{r}
+taxa <- assignTaxonomy(seqtab.nochim, paste(MY_HOME, "/dada2_tutorial_dog/RefSeq-RDP16S_v3_May2018.fa.gz", sep=''), multithread=TRUE) # change the path
+``` 
+
+
+After assigning taxonomy, let's see the results.
+
+```{r}
+taxa.print <- taxa # Removing sequence rownames for display only
+rownames(taxa.print) <- NULL
+head(taxa.print)
+```
+
+Finally, we can save the ASVs table in your working directory.
+
+```{r}
+write.csv(taxa, file="ASVs_taxonomy.csv")
+saveRDS(taxa, "ASVs_taxonomy.rds")
+```
+
+and the ASVs count table.
+
+```{r}
+asv_headers <- vector(dim(seqtab.nochim)[2], mode="character")
+count.asv.tab <- t(seqtab.nochim)
+row.names(count.asv.tab) <- sub(">", "", asv_headers)
+write.csv(count.asv.tab, file="ASVs_counts.csv")
+saveRDS(count.asv.tab, file="ASVs_counts.rds")
+```
+
+## <span style="color:green">10. Alignment</span>
+
+Phylogenetic relatedness is commonly used to inform downstream analyses, especially the calculation of phylogeny- aware distances between microbial communities. The DADA2 sequence inference method is reference-free, so we must construct the phylogenetic tree relating the inferred sequence variants de novo. Before constructing the phylogenetic tree. We should do an anlignment. We can perform a multi-alignment using <span style="color:blue">DECIPHER</span> package.
+
+First, we load the package.
+
+```{r}
+library(DECIPHER)
+```
+
+Then, we do the alignment. We use the <b>seqtab</b> (sequence table as an input) that we got from step number 6.
+
+```{r}
+seqs <- getSequences(seqtab.nochim)
+names(seqs) <- seqs # This propagates to the tip labels of the tree
+alignment <- AlignSeqs(DNAStringSet(seqs), anchor=NA)
+```
+
+## <span style="color:green">11. Construct Phylogenetic Tree</span>
+
+After the alignment, we can construct the phylogenetic tree. We use the <span style="color:blue">phangorn</span> package.
+
+First, we load phangorn package. 
+
+```{r}
+library(phangorn)
+```
+
+If the package is not installed. You can run this command:
+<b>install.packages("phangorn")</b> in your R environment and then load the package.
+
+
+Here, we first construct a neighbor-joining tree, and then fit a GTR+G+I (Generalized time-reversible with Gamma rate variation) maximum likelihood tree using the neighbor-joining tree as a starting point.
+
+```{r}
+phang.align <- phyDat(as(alignment, "matrix"), type="DNA") 
+dm <- dist.ml(phang.align)
+treeNJ <- NJ(dm) # Note, tip order != sequence order
+fit = pml(treeNJ, data=phang.align)
+```
+
+Here, we change the negative edges length to 0. Then, we save the fitGTR file.
+
+```{r}
+fitGTR <- update(fit, k=4, inv=0.2)
+fitGTR <- optim.pml(fitGTR, model="GTR", optInv=TRUE, optGamma=TRUE,
+rearrangement = "stochastic", control = pml.control(trace = 0))
+
+saveRDS(fitGTR, "phangorn.tree.RDS")
+```
+
+
+
+
+
+
